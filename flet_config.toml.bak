@@ -1,9 +1,13 @@
 [build.android]
 org = "com.ghasab"
 product = "downloader"
+name = "تحميل غصب"
+# إضافة مجلد الأصول لضمان وجود ffmpeg داخل الـ APK [استنتاج]
+assets_dir = "assets"
 permissions = [
     "android.permission.INTERNET",
     "android.permission.WRITE_EXTERNAL_STORAGE",
     "android.permission.READ_EXTERNAL_STORAGE",
     "android.permission.MANAGE_EXTERNAL_STORAGE"
 ]
+ 
