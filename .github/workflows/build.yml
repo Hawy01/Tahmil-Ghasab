@@ -29,10 +29,11 @@ jobs:
 
       - name: Build APK
         run: |
-          flet build apk --org com.ghasab --product downloader --android-permissions "android.permission.INTERNET,android.permission.WRITE_EXTERNAL_STORAGE,android.permission.READ_EXTERNAL_STORAGE,android.permission.MANAGE_EXTERNAL_STORAGE"
+          yes | flet build apk --org com.ghasab --product downloader --android-permissions "android.permission.INTERNET,android.permission.WRITE_EXTERNAL_STORAGE,android.permission.READ_EXTERNAL_STORAGE,android.permission.MANAGE_EXTERNAL_STORAGE"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Tahmil-Ghasab-APK
           path: build/apk/*.apk
+
