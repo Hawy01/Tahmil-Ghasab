@@ -7,7 +7,7 @@ import os
 HISTORY_FILE = "download_history.json"
 
 def main(page: ft.Page):
-    page.title = "تحميل غصب - الإصدار النهائي"
+    page.title = "تحميل غصب 🚀"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.AUTO
     page.padding = 20
@@ -17,7 +17,7 @@ def main(page: ft.Page):
     def request_android_permissions():
         if page.platform == ft.PagePlatform.ANDROID:
             try:
-                # طلب صلاحية الوصول للملفات بشكل مباشر
+                # طلب صلاحية الوصول الشامل للملفات
                 os.system(f"am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:com.ghasab.downloader")
             except: pass
 
@@ -33,10 +33,10 @@ def main(page: ft.Page):
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
-    url_input = ft.TextField(label="رابط الفيديو", expand=True, border_radius=15)
+    url_input = ft.TextField(label="رابط الفيديو", expand=True, border_radius=15, hint_text="الصق الرابط هنا...")
     pb = ft.ProgressBar(width=400, value=0, visible=False, color="blueaccent")
     status_text = ft.Text("جاهز لسحب الفيديو غصب...")
-    cookies_info = ft.Text("لم يتم اختيار كوكيز", size=12, italic=True)
+    cookies_info = ft.Text("لم يتم اختيار ملف كوكيز", size=12, italic=True)
     history_column = ft.Column(spacing=10)
     
     history_data = load_history()
@@ -56,7 +56,7 @@ def main(page: ft.Page):
     def on_file_result(e):
         if e.files:
             state["cookies_path"] = e.files[0].path
-            cookies_info.value = f"تم الربط: {e.files[0].name}"
+            cookies_info.value = f"تم ربط الكوكيز: {e.files[0].name}"
             page.update()
 
     file_picker = ft.FilePicker(on_result=on_file_result)
@@ -69,11 +69,9 @@ def main(page: ft.Page):
             page.update()
 
     def download_task(url, cookies_path):
-        # البحث عن FFmpeg المدمج في الأصول أولاً
+        # مسار FFmpeg المدمج في التطبيق
         ffmpeg_bin = os.path.join(os.getcwd(), "assets", "ffmpeg")
-        if not os.path.exists(ffmpeg_bin): ffmpeg_bin = "ffmpeg"
-        
-        # حفظ الملفات في مجلد التحميلات لسهولة الوصول إليها
+        # الحفظ في مجلد التحميلات العام
         download_dir = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
         
         ydl_opts = {
@@ -95,22 +93,24 @@ def main(page: ft.Page):
         history_data.append({"title": title, "status": res_status, "error": res_error})
         save_history(history_data)
         pb.visible = False
+        status_text.value = "تمت المهمة ✅" if res_status == "تم" else "فشل التحميل ❌"
         add_to_ui_history(title, res_status, res_error)
         page.update()
 
     def on_click_download(e):
         if not url_input.value: return
         pb.visible, pb.value = True, 0
-        status_text.value = "⏳ جاري التحميل..."
+        status_text.value = "⏳ جاري السحب غصب..."
         page.update()
         threading.Thread(target=download_task, args=(url_input.value, state["cookies_path"]), daemon=True).start()
 
     page.add(
         ft.Text("تحميل غصب 🚀", size=30, weight="bold", color="blueaccent"),
         ft.Row([url_input, ft.IconButton(ft.icons.GET_APP, on_click=on_click_download)]),
-        ft.Row([ft.ElevatedButton("اختيار الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
+        ft.Row([ft.ElevatedButton("ربط الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
         pb,
         status_text,
+        ft.Divider(),
         history_column
     )
     request_android_permissions()

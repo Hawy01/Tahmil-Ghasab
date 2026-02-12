@@ -32,17 +32,16 @@ jobs:
       - name: Download FFmpeg for Android
         run: |
           mkdir -p assets
-          # استخدام رابط مؤكد ومباشر من مستودع Khang-NT
-          curl -L https://github.com/Khang-NT/ffmpeg-binary-android/releases/download/v4.4.1/ffmpeg-v4.4.1-arm64-v8a.tar.xz -o ffmpeg.tar.xz
+          # تحميل النسخة الأكثر استقراراً ومجربة (arm64-v8a)
+          curl -Lf https://github.com/Khang-NT/ffmpeg-binary-android/releases/download/2018-04-08/arm64-v8a-full.tar.bz2 -o ffmpeg.tar.bz2
           
-          # فك الضغط واستخراج الملف التنفيذي إلى مجلد الأصول
-          tar -xJf ffmpeg.tar.xz -C assets --strip-components=1
+          # فك الضغط (استخدام -xjf للملفات .bz2)
+          tar -xjf ffmpeg.tar.bz2 -C assets --strip-components=1
           chmod +x assets/ffmpeg
-          echo "تم تحميل FFmpeg بنجاح. حجم الملف:" && ls -lh assets/ffmpeg
+          echo "✅ تم تحميل FFmpeg بنجاح. حجم الملف:" && ls -lh assets/ffmpeg
 
       - name: Inject Legacy Storage to Manifest
         run: |
-          # حقن الصلاحية لضمان الوصول للذاكرة في أندرويد 10 وما قبله
           find . -name "AndroidManifest.xml" -exec sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' {} +
 
       - name: Build APK
@@ -52,6 +51,5 @@ jobs:
         run: |
           curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -F "document=@$(find build/apk/ -name "*.apk")" \
-               -F "caption=🚀 تم بناء 'تحميل غصب' بنجاح مع دعم FFmpeg الكامل!" \
+               -F "caption=🚀 تمت المهمة غصب! تم بناء التطبيق مع FFmpeg بنجاح." \
                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
- 
