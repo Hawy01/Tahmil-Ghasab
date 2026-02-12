@@ -1,79 +1,61 @@
 import flet as ft
 import yt_dlp
 import threading
-import json
 import os
-import time
-
-HISTORY_FILE = "download_history.json"
 
 def main(page: ft.Page):
-    # إعدادات الصفحة الأساسية
     page.title = "تحميل غصب"
     page.theme_mode = ft.ThemeMode.DARK
-    page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.window_width = 400
+    page.padding = 20
     
-    # رسالة تحميل أولية لمنع الشاشة السوداء [استنتاج]
-    loading_text = ft.Text("جاري تشغيل المحركات... ثواني")
-    page.add(loading_text)
-    
-    state = {"cookies_path": None, "ffmpeg_bin": None}
+    # واجهة بسيطة جداً عند البدء لمنع الشاشة السوداء [استنتاج]
+    status_text = ft.Text("جاري تهيئة التطبيق...")
+    page.add(ft.Column([ft.Text("تحميل غصب 🚀", size=30, weight="bold"), status_text], alignment=ft.MainAxisAlignment.CENTER))
 
-    def init_app():
-        # البحث عن FFmpeg بشكل آمن
-        possible_path = os.path.join(os.getcwd(), "assets", "ffmpeg")
-        if os.path.exists(possible_path):
-            state["ffmpeg_bin"] = possible_path
-        else:
-            state["ffmpeg_bin"] = "ffmpeg"
+    def request_perms():
+        # محاولة طلب صلاحية الوصول للملفات بشكل مباشر [استنتاج]
+        if page.platform == ft.PagePlatform.ANDROID:
+            try:
+                os.system("am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:com.ghasab.downloader")
+                status_text.value = "يرجى منح صلاحية الوصول للملفات ثم العودة للتطبيق"
+                page.update()
+            except:
+                status_text.value = "جاهز للعمل"
+                page.update()
+
+    def download_video(url):
+        # المستخدم يفضل مجلد التحميلات العام
+        save_path = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
+        ffmpeg_bin = os.path.join(os.getcwd(), "assets", "ffmpeg")
         
-        # إزالة رسالة التحميل وإظهار الواجهة الحقيقية
-        page.controls.clear()
-        setup_ui()
-        page.update()
-
-    def setup_ui():
-        page.vertical_alignment = ft.MainAxisAlignment.START
-        
-        url_input = ft.TextField(label="رابط الفيديو", expand=True, border_radius=15)
-        pb = ft.ProgressBar(width=400, value=0, visible=False)
-        status_text = ft.Text("جاهز للسحب...")
-        history_column = ft.Column(spacing=10)
-
-        def on_click_download(e):
-            if not url_input.value: return
-            pb.visible = True
-            status_text.value = "⏳ جاري التحميل..."
-            page.update()
-            threading.Thread(target=download_task, args=(url_input.value, pb, status_text, history_column), daemon=True).start()
-
-        page.add(
-            ft.Text("تحميل غصب 🚀", size=30, weight="bold"),
-            ft.Row([url_input, ft.IconButton(ft.icons.GET_APP, on_click=on_click_download)]),
-            pb,
-            status_text,
-            ft.Divider(),
-            history_column
-        )
-
-    def download_task(url, pb, status, history):
-        download_dir = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
         ydl_opts = {
-            'ffmpeg_location': state["ffmpeg_bin"],
+            'ffmpeg_location': ffmpeg_bin,
             'format': 'bestvideo+bestaudio/best',
-            'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
+            'outtmpl': f'{save_path}%(title)s.%(ext)s',
         }
+        
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
-            status.value = "✅ اكتمل التحميل!"
-        except Exception as ex:
-            status.value = f"❌ خطأ: {str(ex)[:30]}"
-        pb.visible = False
+            page.snack_bar = ft.SnackBar(ft.Text("تم التحميل بنجاح في مجلد Downloads!"))
+            page.snack_bar.open = True
+        except Exception as e:
+            page.snack_bar = ft.SnackBar(ft.Text(f"فشل التحميل: {str(e)[:50]}"))
+            page.snack_bar.open = True
         page.update()
 
-    # تشغيل التهيئة بعد قليل لضمان ظهور الصفحة أولاً
-    threading.Thread(target=init_app, daemon=True).start()
+    # واجهة التحميل الحقيقية
+    url_input = ft.TextField(label="رابط الفيديو", expand=True)
+    btn = ft.ElevatedButton("تحميل غصب", on_click=lambda _: threading.Thread(target=download_video, args=(url_input.value,)).start())
+    
+    # تبديل الواجهة بعد ثانية واحدة لضمان عدم حدوث شاشة سوداء [استنتاج]
+    def switch_ui():
+        page.controls.clear()
+        page.add(ft.Column([ft.Text("تحميل غصب 🚀", size=30, weight="bold"), url_input, btn]))
+        page.update()
+        request_perms()
+
+    ft.Timer(1, switch_ui).start()
 
 ft.app(target=main)
