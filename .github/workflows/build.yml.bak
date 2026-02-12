@@ -27,19 +27,19 @@ jobs:
         run: yes | flutter doctor --android-licenses || true
 
       - name: Install Dependencies
-        run: |
-          pip install flet yt-dlp google-genai
+        run: pip install flet yt-dlp google-genai
 
       - name: Download FFmpeg for Android
         run: |
           mkdir -p assets
-          # تحميل FFmpeg من مصدر مستقر بديل [استنتاج]
-          curl -L https://github.com/Bofung/ffmpeg-android-static/releases/download/v4.4/ffmpeg-v4.4-android-arm64.tar.gz -o ffmpeg.tar.gz
+          # تحميل FFmpeg من مصدر مستقر بديل (نسخة arm64)
+          # استخدمنا -f لضمان عدم تحميل ملفات تالفة 404
+          curl -Lf https://github.com/master-of-zen/FFmpeg-binaries/releases/download/n4.4.1/ffmpeg-n4.4.1-android-arm64-static.tar.gz -o ffmpeg.tar.gz
           
-          # فك الضغط ونقل الملف التنفيذي لمجلد الأصول [استنتاج]
+          # فك الضغط مباشرة داخل مجلد assets
           tar -xzf ffmpeg.tar.gz -C assets --strip-components=1
           chmod +x assets/ffmpeg
-          ls -lh assets/ # للتأكد من حجم الملف في السجلات
+          echo "حجم ملف FFmpeg المحمل:" && ls -lh assets/ffmpeg
 
       - name: Inject Legacy Storage to Manifest
         run: |
@@ -52,5 +52,5 @@ jobs:
         run: |
           curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -F "document=@$(find build/apk/ -name "*.apk")" \
-               -F "caption=🚀 تم تجاوز خطأ الـ 9 بايت وبناء 'تحميل غصب' بنجاح!" \
+               -F "caption=🚀 تمت المهمة! تم بناء 'تحميل غصب' مع FFmpeg بنجاح." \
                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
