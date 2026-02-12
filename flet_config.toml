@@ -1,0 +1,9 @@
+[build.android]
+org = "com.ghasab"
+product = "downloader"
+permissions = [
+    "android.permission.INTERNET",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.MANAGE_EXTERNAL_STORAGE"
+]
