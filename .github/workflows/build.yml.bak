@@ -23,16 +23,8 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Accept Android Licenses
-        run: yes | flutter doctor --android-licenses || true
-
       - name: Install Dependencies
-        run: pip install flet yt-dlp python-ffmpeg-android google-genai
-
-      - name: Inject Legacy Storage to Manifest
-        run: |
-          # تعديل المانيفست ليدعم التخزين القديم في أندرويد 10 [استنتاج]
-          find . -name "AndroidManifest.xml" -exec sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' {} +
+        run: pip install -r requirements.txt
 
       - name: Build APK
         run: yes | flet build apk
@@ -41,5 +33,5 @@ jobs:
         run: |
           curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -F "document=@$(find build/apk/ -name "*.apk")" \
-               -F "caption=🚀 تم حقن الصلاحيات وبناء 'تحميل غصب' بنجاح! جرب النسخة الآن." \
+               -F "caption=    ' ' !    @w_Hawy_w" \
                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
