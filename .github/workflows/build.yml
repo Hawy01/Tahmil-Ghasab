@@ -23,15 +23,19 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Accept Android Licenses
-        run: yes | flutter doctor --android-licenses || true
-
       - name: Install Dependencies
-        run: pip install flet yt-dlp python-ffmpeg-android google-genai
+        run: |
+          pip install flet yt-dlp google-genai
+
+      - name: Download FFmpeg for Android
+        run: |
+          mkdir -p assets
+          # تحميل نسخة FFmpeg مخصصة لمعالجات الأندرويد (arm64) [استنتاج]
+          curl -L https://github.com/Khang-NT/ffmpeg-binary-android/releases/download/v4.4.1/ffmpeg-android-arm64.tar.gz | tar xz -C assets
+          chmod +x assets/ffmpeg
 
       - name: Inject Legacy Storage to Manifest
         run: |
-          # تعديل المانيفست ليدعم التخزين القديم في أندرويد 10 [استنتاج]
           find . -name "AndroidManifest.xml" -exec sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' {} +
 
       - name: Build APK
@@ -41,5 +45,5 @@ jobs:
         run: |
           curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -F "document=@$(find build/apk/ -name "*.apk")" \
-               -F "caption=🚀 تم حقن الصلاحيات وبناء 'تحميل غصب' بنجاح! جرب النسخة الآن." \
+               -F "caption=🚀 تم إصلاح الخطأ وبناء 'تحميل غصب' بنجاح!" \
                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
