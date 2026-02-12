@@ -1,8 +1,68 @@
+name: Build Ghasab APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Accept Android Licenses
+        run: yes | flutter doctor --android-licenses || true
+
+      - name: Install Dependencies
+        run: pip install flet yt-dlp google-genai
+
+      - name: Download FFmpeg for Android
+        run: |
+          mkdir -p assets
+          # تحميل نسخة Khang-NT المستقرة (arm64-v8a)
+          curl -Lf https://github.com/Khang-NT/ffmpeg-binary-android/releases/download/2018-04-08/arm64-v8a-full.tar.bz2 -o ffmpeg.tar.bz2
+          tar -xjf ffmpeg.tar.bz2 -C assets --strip-components=1
+          chmod +x assets/ffmpeg
+
+      - name: Inject Legacy Storage to Manifest
+        run: |
+          find . -name "AndroidManifest.xml" -exec sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' {} +
+
+      - name: Build APK
+        run: yes | flet build apk
+
+      - name: Upload to GitHub Releases
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "إصدار تحميل غصب رقم ${{ github.run_number }}"
+          files: build/apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Send Download Link to Telegram
         run: |
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/downloader_android.apk"
-          MESSAGE="🚀 <b>تم البناء بنجاح!</b>%0A🔗 <a href='$DOWNLOAD_URL'>اضغط هنا لتحميل التطبيق</a>"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          # استخدام HTML لتجنب أخطاء الرموز الخاصة في Markdown [استنتاج]
+          MESSAGE="🚀 <b>تم بناء تطبيق تحميل غصب بنجاح!</b>%0A%0A📦 <b>الحجم:</b> كبير (أكثر من 50MB)%0A🔗 <a href='$DOWNLOAD_URL'>اضغط هنا لتحميل التطبيق مباشرة</a>"
+          
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
                -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -d "text=$MESSAGE" \
                -d "parse_mode=HTML"
