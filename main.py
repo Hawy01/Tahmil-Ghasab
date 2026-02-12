@@ -1,118 +1,61 @@
 import flet as ft
 import yt_dlp
 import threading
-import json
 import os
 
-HISTORY_FILE = "download_history.json"
-
 def main(page: ft.Page):
-    page.title = "تحميل غصب 🚀"
+    page.title = "تحميل غصب"
     page.theme_mode = ft.ThemeMode.DARK
-    page.scroll = ft.ScrollMode.AUTO
+    page.window_width = 400
     page.padding = 20
+    
+    # واجهة بسيطة جداً عند البدء لمنع الشاشة السوداء [استنتاج]
+    status_text = ft.Text("جاري تهيئة التطبيق...")
+    page.add(ft.Column([ft.Text("تحميل غصب 🚀", size=30, weight="bold"), status_text], alignment=ft.MainAxisAlignment.CENTER))
 
-    state = {"cookies_path": None}
-
-    def request_android_permissions():
+    def request_perms():
+        # محاولة طلب صلاحية الوصول للملفات بشكل مباشر [استنتاج]
         if page.platform == ft.PagePlatform.ANDROID:
             try:
-                # طلب صلاحية الوصول الشامل للملفات
-                os.system(f"am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:com.ghasab.downloader")
-            except: pass
+                os.system("am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:com.ghasab.downloader")
+                status_text.value = "يرجى منح صلاحية الوصول للملفات ثم العودة للتطبيق"
+                page.update()
+            except:
+                status_text.value = "جاهز للعمل"
+                page.update()
 
-    def load_history():
-        if os.path.exists(HISTORY_FILE):
-            try:
-                with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except: return []
-        return []
-
-    def save_history(data):
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-
-    url_input = ft.TextField(label="رابط الفيديو", expand=True, border_radius=15, hint_text="الصق الرابط هنا...")
-    pb = ft.ProgressBar(width=400, value=0, visible=False, color="blueaccent")
-    status_text = ft.Text("جاهز لسحب الفيديو غصب...")
-    cookies_info = ft.Text("لم يتم اختيار ملف كوكيز", size=12, italic=True)
-    history_column = ft.Column(spacing=10)
-    
-    history_data = load_history()
-
-    def add_to_ui_history(title, status, error=""):
-        icon = ft.icons.CHECK_CIRCLE if status == "تم" else ft.icons.ERROR
-        history_column.controls.insert(0, ft.ListTile(
-            leading=ft.Icon(icon, color="green" if status == "تم" else "red"),
-            title=ft.Text(title, max_lines=1, overflow="ellipsis"),
-            subtitle=ft.Text(f"الحالة: {status} {error}"),
-        ))
-        page.update()
-
-    for item in history_data:
-        add_to_ui_history(item['title'], item['status'], item.get('error', ""))
-
-    def on_file_result(e):
-        if e.files:
-            state["cookies_path"] = e.files[0].path
-            cookies_info.value = f"تم ربط الكوكيز: {e.files[0].name}"
-            page.update()
-
-    file_picker = ft.FilePicker(on_result=on_file_result)
-    page.overlay.append(file_picker)
-
-    def progress_hook(d):
-        if d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
-            pb.value = d.get('downloaded_bytes', 0) / total
-            page.update()
-
-    def download_task(url, cookies_path):
-        # مسار FFmpeg المدمج في التطبيق
+    def download_video(url):
+        # المستخدم يفضل مجلد التحميلات العام
+        save_path = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
         ffmpeg_bin = os.path.join(os.getcwd(), "assets", "ffmpeg")
-        # الحفظ في مجلد التحميلات العام
-        download_dir = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
         
         ydl_opts = {
             'ffmpeg_location': ffmpeg_bin,
             'format': 'bestvideo+bestaudio/best',
-            'progress_hooks': [progress_hook],
-            'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
+            'outtmpl': f'{save_path}%(title)s.%(ext)s',
         }
         
-        if cookies_path: ydl_opts['cookiefile'] = cookies_path
-
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title, res_status, res_error = info.get('title', 'فيديو'), "تم", ""
-        except Exception as ex:
-            title, res_status, res_error = url, "فشل", str(ex)[:40]
-
-        history_data.append({"title": title, "status": res_status, "error": res_error})
-        save_history(history_data)
-        pb.visible = False
-        status_text.value = "تمت المهمة ✅" if res_status == "تم" else "فشل التحميل ❌"
-        add_to_ui_history(title, res_status, res_error)
+                ydl.download([url])
+            page.snack_bar = ft.SnackBar(ft.Text("تم التحميل بنجاح في مجلد Downloads!"))
+            page.snack_bar.open = True
+        except Exception as e:
+            page.snack_bar = ft.SnackBar(ft.Text(f"فشل التحميل: {str(e)[:50]}"))
+            page.snack_bar.open = True
         page.update()
 
-    def on_click_download(e):
-        if not url_input.value: return
-        pb.visible, pb.value = True, 0
-        status_text.value = "⏳ جاري السحب غصب..."
+    # واجهة التحميل الحقيقية
+    url_input = ft.TextField(label="رابط الفيديو", expand=True)
+    btn = ft.ElevatedButton("تحميل غصب", on_click=lambda _: threading.Thread(target=download_video, args=(url_input.value,)).start())
+    
+    # تبديل الواجهة بعد ثانية واحدة لضمان عدم حدوث شاشة سوداء [استنتاج]
+    def switch_ui():
+        page.controls.clear()
+        page.add(ft.Column([ft.Text("تحميل غصب 🚀", size=30, weight="bold"), url_input, btn]))
         page.update()
-        threading.Thread(target=download_task, args=(url_input.value, state["cookies_path"]), daemon=True).start()
+        request_perms()
 
-    page.add(
-        ft.Text("تحميل غصب 🚀", size=30, weight="bold", color="blueaccent"),
-        ft.Row([url_input, ft.IconButton(ft.icons.GET_APP, on_click=on_click_download)]),
-        ft.Row([ft.ElevatedButton("ربط الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
-        pb,
-        status_text,
-        ft.Divider(),
-        history_column
-    )
-    request_android_permissions()
+    ft.Timer(1, switch_ui).start()
 
 ft.app(target=main)

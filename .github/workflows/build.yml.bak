@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions: # إضافة صلاحيات لكتابة الإصدارات (Releases)
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -32,13 +34,9 @@ jobs:
       - name: Download FFmpeg for Android
         run: |
           mkdir -p assets
-          # تحميل النسخة الأكثر استقراراً ومجربة (arm64-v8a)
           curl -Lf https://github.com/Khang-NT/ffmpeg-binary-android/releases/download/2018-04-08/arm64-v8a-full.tar.bz2 -o ffmpeg.tar.bz2
-          
-          # فك الضغط (استخدام -xjf للملفات .bz2)
           tar -xjf ffmpeg.tar.bz2 -C assets --strip-components=1
           chmod +x assets/ffmpeg
-          echo "✅ تم تحميل FFmpeg بنجاح. حجم الملف:" && ls -lh assets/ffmpeg
 
       - name: Inject Legacy Storage to Manifest
         run: |
@@ -47,9 +45,24 @@ jobs:
       - name: Build APK
         run: yes | flet build apk
 
-      - name: Send APK to Telegram
+      - name: Upload to GitHub Releases
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "إصدار تحميل غصب رقم ${{ github.run_number }}"
+          files: build/apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Download Link to Telegram
         run: |
-          curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-               -F "document=@$(find build/apk/ -name "*.apk")" \
-               -F "caption=🚀 تمت المهمة غصب! تم بناء التطبيق مع FFmpeg بنجاح." \
-               https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
+          # الحصول على رابط الملف من الخطوة السابقة
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/downloader_android.apk"
+          
+          MESSAGE="🚀 *تم بناء تطبيق تحميل غصب بنجاح!* %0A%0A📦 *الحجم:* كبير (أكثر من 50MB)%0A🔗 *رابط التحميل المباشر:* %0A$DOWNLOAD_URL"
+          
+          curl -v "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+               -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+               -d "text=$MESSAGE" \
+               -d "parse_mode=Markdown"
