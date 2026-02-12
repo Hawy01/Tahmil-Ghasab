@@ -7,7 +7,7 @@ import os
 HISTORY_FILE = "download_history.json"
 
 def main(page: ft.Page):
-    page.title = "تحميل غصب - النسخة النهائية"
+    page.title = "تحميل غصب - الإصدار النهائي"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.AUTO
     page.padding = 20
@@ -16,12 +16,9 @@ def main(page: ft.Page):
 
     def request_android_permissions():
         if page.platform == ft.PagePlatform.ANDROID:
-            package_name = "com.ghasab.downloader"
+            package_name = "com.ghasab.downloader" #
             try:
                 os.system(f"am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:{package_name}")
-                page.snack_bar = ft.SnackBar(ft.Text("يرجى تفعيل صلاحية الوصول للملفات"))
-                page.snack_bar.open = True
-                page.update()
             except: pass
 
     def load_history():
@@ -72,8 +69,9 @@ def main(page: ft.Page):
             page.update()
 
     def download_task(url, cookies_path):
-        # تحديد مسار FFmpeg المدمج في الأصول [استنتاج]
-        ffmpeg_bin = os.path.abspath("assets/ffmpeg")
+        # مسار FFmpeg المدمج في التطبيق
+        ffmpeg_bin = os.path.join(os.getcwd(), "assets", "ffmpeg")
+        # الحفظ في مجلد التحميلات العام
         download_dir = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
         
         ydl_opts = {
@@ -101,14 +99,14 @@ def main(page: ft.Page):
     def on_click_download(e):
         if not url_input.value: return
         pb.visible, pb.value = True, 0
-        status_text.value = "⏳ جاري التحميل..."
+        status_text.value = "⏳ جاري السحب غصب..."
         page.update()
         threading.Thread(target=download_task, args=(url_input.value, state["cookies_path"]), daemon=True).start()
 
     page.add(
         ft.Text("تحميل غصب 🚀", size=30, weight="bold"),
         ft.Row([url_input, ft.IconButton(ft.icons.GET_APP, on_click=on_click_download)]),
-        ft.Row([ft.ElevatedButton("اختيار الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
+        ft.Row([ft.ElevatedButton("الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
         pb,
         status_text,
         history_column

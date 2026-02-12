@@ -16,9 +16,9 @@ def main(page: ft.Page):
 
     def request_android_permissions():
         if page.platform == ft.PagePlatform.ANDROID:
-            package_name = "com.ghasab.downloader" #
             try:
-                os.system(f"am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:{package_name}")
+                # طلب صلاحية الوصول للملفات بشكل مباشر
+                os.system(f"am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:com.ghasab.downloader")
             except: pass
 
     def load_history():
@@ -35,7 +35,7 @@ def main(page: ft.Page):
 
     url_input = ft.TextField(label="رابط الفيديو", expand=True, border_radius=15)
     pb = ft.ProgressBar(width=400, value=0, visible=False, color="blueaccent")
-    status_text = ft.Text("جاهز للسحب...")
+    status_text = ft.Text("جاهز لسحب الفيديو غصب...")
     cookies_info = ft.Text("لم يتم اختيار كوكيز", size=12, italic=True)
     history_column = ft.Column(spacing=10)
     
@@ -69,9 +69,11 @@ def main(page: ft.Page):
             page.update()
 
     def download_task(url, cookies_path):
-        # مسار FFmpeg المدمج في التطبيق
+        # البحث عن FFmpeg المدمج في الأصول أولاً
         ffmpeg_bin = os.path.join(os.getcwd(), "assets", "ffmpeg")
-        # الحفظ في مجلد التحميلات العام
+        if not os.path.exists(ffmpeg_bin): ffmpeg_bin = "ffmpeg"
+        
+        # حفظ الملفات في مجلد التحميلات لسهولة الوصول إليها
         download_dir = "/storage/emulated/0/Download/" if page.platform == ft.PagePlatform.ANDROID else "./"
         
         ydl_opts = {
@@ -99,14 +101,14 @@ def main(page: ft.Page):
     def on_click_download(e):
         if not url_input.value: return
         pb.visible, pb.value = True, 0
-        status_text.value = "⏳ جاري السحب غصب..."
+        status_text.value = "⏳ جاري التحميل..."
         page.update()
         threading.Thread(target=download_task, args=(url_input.value, state["cookies_path"]), daemon=True).start()
 
     page.add(
-        ft.Text("تحميل غصب 🚀", size=30, weight="bold"),
+        ft.Text("تحميل غصب 🚀", size=30, weight="bold", color="blueaccent"),
         ft.Row([url_input, ft.IconButton(ft.icons.GET_APP, on_click=on_click_download)]),
-        ft.Row([ft.ElevatedButton("الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
+        ft.Row([ft.ElevatedButton("اختيار الكوكيز", on_click=lambda _: file_picker.pick_files()), cookies_info]),
         pb,
         status_text,
         history_column
