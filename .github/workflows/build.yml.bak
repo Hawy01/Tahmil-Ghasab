@@ -27,17 +27,18 @@ jobs:
         run: yes | flutter doctor --android-licenses || true
 
       - name: Install Dependencies
-        run: |
-          pip install flet yt-dlp google-genai
+        run: pip install flet yt-dlp google-genai
 
       - name: Download FFmpeg for Android
         run: |
           mkdir -p assets
-          # تحميل النسخة الصحيحة والمؤكدة لمعمارية arm64 [استنتاج]
+          # تحميل FFmpeg من مصدر مستقر لمعمارية arm64
           curl -L https://github.com/Khang-NT/ffmpeg-binary-android/releases/download/v4.4.1/ffmpeg-v4.4.1-arm64-v8a.tar.xz -o ffmpeg.tar.xz
-          # فك الضغط ونقل الملف ليكون في مجلد assets مباشرة [استنتاج]
-          tar -xJf ffmpeg.tar.xz -C assets --strip-components=1
+          
+          # فك الضغط ونقل الملف التنفيذي فقط إلى مجلد assets
+          tar -xJf ffmpeg.tar.xz --strip-components=1 -C assets
           chmod +x assets/ffmpeg
+          ls -lh assets/  # للتأكد من وجود الملف وحجمه في السجلات
 
       - name: Inject Legacy Storage to Manifest
         run: |
@@ -50,5 +51,5 @@ jobs:
         run: |
           curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -F "document=@$(find build/apk/ -name "*.apk")" \
-               -F "caption=🚀 تم إصلاح التحميل وبناء 'تحميل غصب' بنجاح! جربها الآن." \
+               -F "caption=🚀 تم تجاوز خطأ التحميل وبناء 'تحميل غصب' بنجاح!" \
                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
