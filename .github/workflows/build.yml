@@ -23,17 +23,24 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Accept Android Licenses
+        run: |
+          yes | flutter doctor --android-licenses || true
+
       - name: Install Dependencies
         run: |
           pip install flet yt-dlp google-genai
 
       - name: Build APK
         run: |
-          yes | flet build apk --org com.ghasab --product downloader --android-permissions "android.permission.INTERNET,android.permission.WRITE_EXTERNAL_STORAGE,android.permission.READ_EXTERNAL_STORAGE,android.permission.MANAGE_EXTERNAL_STORAGE"
+          flet build apk --org com.ghasab --product downloader \
+            --include-permission android.permission.INTERNET \
+            --include-permission android.permission.WRITE_EXTERNAL_STORAGE \
+            --include-permission android.permission.READ_EXTERNAL_STORAGE \
+            --include-permission android.permission.MANAGE_EXTERNAL_STORAGE
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Tahmil-Ghasab-APK
           path: build/apk/*.apk
-
