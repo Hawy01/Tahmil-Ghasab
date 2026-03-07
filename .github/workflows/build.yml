@@ -29,7 +29,7 @@ jobs:
         run: yes | flutter doctor --android-licenses || true
 
       - name: Install Dependencies
-        run: pip install flet yt-dlp google-genai
+        run: pip install flet yt-dlp
 
       - name: Download FFmpeg for Android
         run: |
