@@ -153,8 +153,8 @@ def main(page: ft.Page):
             ft.ElevatedButton("عرض السجل الكامل",
                               on_click=show_log_dialog,
                               style=ft.ButtonStyle(
-                                  bgcolor={"": "#1e1e3e"},
-                                  color={"": "#a78bfa"},
+                                  bgcolor="#1e1e3e",
+                                  color="#a78bfa",
                               )),
         ]
         safe_update()
@@ -213,18 +213,18 @@ def main(page: ft.Page):
             label="جودة التحميل",
             value="best",
             options=[
-                ft.dropdown.Option("best",  "أفضل جودة"),
-                ft.dropdown.Option("1080",  "1080p"),
-                ft.dropdown.Option("720",   "720p"),
-                ft.dropdown.Option("480",   "480p"),
-                ft.dropdown.Option("audio", "صوت فقط (MP3)"),
+                ft.DropdownOption(key="best",  text="أفضل جودة"),
+                ft.DropdownOption(key="1080",  text="1080p"),
+                ft.DropdownOption(key="720",   text="720p"),
+                ft.DropdownOption(key="480",   text="480p"),
+                ft.DropdownOption(key="audio", text="صوت فقط (MP3)"),
             ],
         )
         log("quality_dd OK")
     except Exception as ex:
         log_exc("quality_dd", ex)
         quality_dd = ft.Dropdown(label="جودة التحميل", value="best", options=[
-            ft.dropdown.Option("best", "أفضل جودة"),
+            ft.DropdownOption(key="best", text="أفضل جودة"),
         ])
 
     cookies_label  = ft.Text("لم يتم اختيار ملف كوكيز", size=12, color="#888")
@@ -238,10 +238,10 @@ def main(page: ft.Page):
     try:
         download_btn = ft.ElevatedButton(
             text="تحميل غصب",
-            icon=ft.icons.DOWNLOAD,
+            icon=ft.Icons.DOWNLOAD,
             style=ft.ButtonStyle(
-                bgcolor={"": "#5c5cff"},
-                color={"": "#ffffff"},
+                bgcolor="#5c5cff",
+                color="#ffffff",
                 shape=ft.RoundedRectangleBorder(radius=14),
             ),
         )
@@ -285,11 +285,11 @@ def main(page: ft.Page):
     try:
         cookies_btn = ft.ElevatedButton(
             text="إضافة كوكيز",
-            icon=ft.icons.COOKIE,
+            icon=ft.Icons.COOKIE,
             on_click=pick_cookies,
             style=ft.ButtonStyle(
-                bgcolor={"": "#1e1e3e"},
-                color={"": "#a78bfa"},
+                bgcolor="#1e1e3e",
+                color="#a78bfa",
                 shape=ft.RoundedRectangleBorder(radius=12),
             ),
         )
@@ -305,7 +305,7 @@ def main(page: ft.Page):
     log_btn = ft.TextButton(
         text="📋 سجل",
         on_click=show_log_dialog,
-        style=ft.ButtonStyle(color={"": "#555"}),
+        style=ft.ButtonStyle(color="#555"),
     )
 
     # ── فحص صلاحية التخزين ──────────────────────────────────────
