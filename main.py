@@ -3,12 +3,11 @@ import threading
 import traceback
 import os
 
-# yt_dlp يُستورد داخل دالة التحميل فقط لتفادي تجميد الشاشة عند البدء
 DOWNLOAD_DIR = "/storage/emulated/0/Download"
 APP_PACKAGE  = "com.ghasab.downloader"
 
 
-def get_ffmpeg_path() -> str | None:
+def get_ffmpeg_path():
     candidates = [
         os.path.join(os.getcwd(), "assets", "ffmpeg"),
         os.path.join(os.path.dirname(__file__), "assets", "ffmpeg"),
@@ -26,17 +25,23 @@ def get_ffmpeg_path() -> str | None:
 
 
 def main(page: ft.Page):
+    # ── أول شيء: عرض نص فوري لمنع الشاشة السوداء ───────────────
     page.title      = "تحميل غصب"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor    = "#0d0d1a"
-    page.padding    = 0
+    page.padding    = 16
+    page.scroll     = ft.ScrollMode.AUTO   # scroll على Page مباشرة
 
-    # ── سجل الأخطاء المرئي ──────────────────────────────────────
+    splash = ft.Text("جاري تهيئة التطبيق...", color="#aaa", size=14)
+    page.add(splash)
+    page.update()   # ← يُظهر شيئاً فوراً قبل أي عملية ثقيلة
+
+    # ── سجل الأخطاء ──────────────────────────────────────────────
     error_log = ft.Text("", size=11, color="#fca5a5", selectable=True)
     error_card = ft.Container(
         content=ft.Column([
             ft.Row([
-                ft.Icon(ft.Icons.BUG_REPORT, color="#f87171", size=16),
+                ft.Icon(ft.icons.BUG_REPORT, color="#f87171", size=16),
                 ft.Text("سجل الأخطاء", size=12, color="#f87171",
                         weight=ft.FontWeight.BOLD),
             ], spacing=6),
@@ -45,14 +50,12 @@ def main(page: ft.Page):
         padding=12,
         bgcolor="#1a0808",
         border_radius=10,
-        border=ft.border.all(1, "#3a1010"),
-        margin=ft.margin.symmetric(horizontal=16, vertical=4),
         visible=False,
     )
 
     def show_error(context: str, exc: Exception):
         tb = traceback.format_exc()
-        error_log.value = f"[{context}]\n{type(exc).__name__}: {exc}\n\n{tb[-500:]}"
+        error_log.value   = f"[{context}]\n{type(exc).__name__}: {exc}\n\n{tb[-600:]}"
         error_card.visible = True
         try:
             page.update()
@@ -62,7 +65,7 @@ def main(page: ft.Page):
     def clear_error():
         error_card.visible = False
 
-    # ── حالة التطبيق ────────────────────────────────────────────
+    # ── حالة التطبيق ─────────────────────────────────────────────
     cookies_path   = {"value": None}
     is_downloading = {"value": False}
 
@@ -72,7 +75,6 @@ def main(page: ft.Page):
         hint_text="https://youtube.com/watch?v=...",
         border_radius=12,
         filled=True,
-        expand=True,
         border_color="#5c5cff",
         focused_border_color="#a78bfa",
         cursor_color="#a78bfa",
@@ -80,17 +82,13 @@ def main(page: ft.Page):
 
     quality_dd = ft.Dropdown(
         label="جودة التحميل",
-        border_radius=12,
-        filled=True,
-        border_color="#5c5cff",
-        focused_border_color="#a78bfa",
         value="best",
         options=[
-            ft.dropdown.Option(key="best",  text="أفضل جودة"),
-            ft.dropdown.Option(key="1080",  text="1080p"),
-            ft.dropdown.Option(key="720",   text="720p"),
-            ft.dropdown.Option(key="480",   text="480p"),
-            ft.dropdown.Option(key="audio", text="صوت فقط (MP3)"),
+            ft.dropdown.Option("best",  "أفضل جودة"),
+            ft.dropdown.Option("1080",  "1080p"),
+            ft.dropdown.Option("720",   "720p"),
+            ft.dropdown.Option("480",   "480p"),
+            ft.dropdown.Option("audio", "صوت فقط (MP3)"),
         ],
     )
 
@@ -112,19 +110,18 @@ def main(page: ft.Page):
         text_align=ft.TextAlign.CENTER,
     )
 
-    perm_banner = ft.Text("", size=11, color="#fbbf24")
+    perm_text = ft.Text("", size=11, color="#fbbf24")
 
     download_btn = ft.ElevatedButton(
         text="تحميل غصب",
-        icon=ft.Icons.DOWNLOAD,
+        icon=ft.icons.DOWNLOAD,
+        expand=True,
         style=ft.ButtonStyle(
-            bgcolor={"": "#5c5cff", "hovered": "#7c7cff"},
+            bgcolor={"": "#5c5cff"},
             color="#ffffff",
             shape=ft.RoundedRectangleBorder(radius=14),
             padding=ft.padding.symmetric(vertical=14, horizontal=24),
-            elevation={"": 6},
         ),
-        expand=True,
     )
 
     # ── FilePicker للكوكيز ────────────────────────────────────────
@@ -157,18 +154,18 @@ def main(page: ft.Page):
         except Exception as ex:
             show_error("pick_cookies", ex)
 
-    cookies_btn = ft.OutlinedButton(
+    cookies_btn = ft.ElevatedButton(
         text="كوكيز",
-        icon=ft.Icons.COOKIE,
-        style=ft.ButtonStyle(
-            side=ft.BorderSide(width=1, color="#5c5cff"),
-            shape=ft.RoundedRectangleBorder(radius=12),
-            color="#a78bfa",
-        ),
+        icon=ft.icons.COOKIE,
         on_click=pick_cookies,
+        style=ft.ButtonStyle(
+            bgcolor={"": "#1e1e3e"},
+            color="#a78bfa",
+            shape=ft.RoundedRectangleBorder(radius=12),
+        ),
     )
 
-    # ── التحقق من صلاحية التخزين ────────────────────────────────
+    # ── فحص صلاحية التخزين ──────────────────────────────────────
     def check_storage_perm():
         if page.platform != ft.PagePlatform.ANDROID:
             return
@@ -178,56 +175,27 @@ def main(page: ft.Page):
             with open(test, "w") as f:
                 f.write("ok")
             os.remove(test)
-            perm_banner.value = "✅ صلاحية التخزين ممنوحة"
-            perm_banner.color = "#6ee7b7"
+            perm_text.value = "✅ صلاحية التخزين ممنوحة"
+            perm_text.color = "#6ee7b7"
         except PermissionError:
-            perm_banner.value = "⚠️ لا توجد صلاحية تخزين — افتح إعدادات التطبيق ومنح الإذن يدوياً"
-            perm_banner.color = "#f87171"
+            perm_text.value = "⚠️ لا توجد صلاحية تخزين — افتح إعدادات التطبيق"
+            perm_text.color = "#f87171"
             try:
                 os.system(
-                    f"am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"
+                    "am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"
                     f" -d package:{APP_PACKAGE} > /dev/null 2>&1 &"
                 )
             except Exception:
                 pass
         except Exception as ex:
-            perm_banner.value = f"⚠️ {ex}"
-            perm_banner.color = "#fbbf24"
+            perm_text.value = f"⚠️ تحقق من الصلاحيات: {ex}"
+            perm_text.color = "#fbbf24"
         try:
             page.update()
         except Exception:
             pass
 
     # ── منطق التحميل ─────────────────────────────────────────────
-    def build_ydl_opts(quality: str, yt_dlp_module) -> dict:
-        save_path  = DOWNLOAD_DIR if os.path.isdir(DOWNLOAD_DIR) else "./"
-        ffmpeg_bin = get_ffmpeg_path()
-
-        if quality == "audio":
-            fmt  = "bestaudio/best"
-            post = [{"key": "FFmpegExtractAudio",
-                     "preferredcodec": "mp3", "preferredquality": "192"}]
-        else:
-            fmt  = ("bestvideo+bestaudio/best" if quality == "best"
-                    else f"bestvideo[height<={quality}]+bestaudio/best[height<={quality}]")
-            post = []
-
-        opts = {
-            "format":             fmt,
-            "outtmpl":            f"{save_path}/%(title)s.%(ext)s",
-            "merge_output_format":"mp4",
-            "postprocessors":     post,
-            "noplaylist":         False,
-            "quiet":              True,
-            "no_warnings":        True,
-            "progress_hooks":     [progress_hook],
-        }
-        if ffmpeg_bin:
-            opts["ffmpeg_location"] = ffmpeg_bin
-        if cookies_path["value"]:
-            opts["cookiefile"] = cookies_path["value"]
-        return opts
-
     def progress_hook(d: dict):
         try:
             if d["status"] == "downloading":
@@ -237,34 +205,57 @@ def main(page: ft.Page):
                 eta        = d.get("eta") or 0
                 pct        = (downloaded / total) if total else 0
                 speed_mb   = speed / 1_048_576 if speed else 0
-
                 progress_bar.value   = pct
-                progress_label.value = (
-                    f"{pct*100:.0f}%  ·  {speed_mb:.1f} MB/s  ·  ETA: {eta}ث"
-                )
-                status_text.value = "جاري التحميل..."
-                status_text.color = "#fbbf24"
+                progress_label.value = f"{pct*100:.0f}%  ·  {speed_mb:.1f} MB/s  ·  ETA: {eta}ث"
+                status_text.value    = "جاري التحميل..."
+                status_text.color    = "#fbbf24"
                 page.update()
-
             elif d["status"] == "finished":
                 progress_bar.value = 1
                 status_text.value  = "جاري المعالجة..."
                 status_text.color  = "#60a5fa"
                 page.update()
         except Exception:
-            pass  # لا نوقف التحميل بسبب خطأ في واجهة المستخدم
+            pass
 
     def do_download(url: str, quality: str):
         try:
-            import yt_dlp  # استيراد متأخر — لا يُجمّد شاشة البدء
-            opts = build_ydl_opts(quality, yt_dlp)
+            import yt_dlp  # استيراد متأخر لتفادي تجميد شاشة البدء
+
+            save_path  = DOWNLOAD_DIR if os.path.isdir(DOWNLOAD_DIR) else "./"
+            ffmpeg_bin = get_ffmpeg_path()
+
+            if quality == "audio":
+                fmt  = "bestaudio/best"
+                post = [{"key": "FFmpegExtractAudio",
+                         "preferredcodec": "mp3", "preferredquality": "192"}]
+            else:
+                fmt  = ("bestvideo+bestaudio/best" if quality == "best"
+                        else f"bestvideo[height<={quality}]+bestaudio/best[height<={quality}]")
+                post = []
+
+            opts = {
+                "format":             fmt,
+                "outtmpl":            f"{save_path}/%(title)s.%(ext)s",
+                "merge_output_format":"mp4",
+                "postprocessors":     post,
+                "noplaylist":         False,
+                "quiet":              True,
+                "no_warnings":        True,
+                "progress_hooks":     [progress_hook],
+            }
+            if ffmpeg_bin:
+                opts["ffmpeg_location"] = ffmpeg_bin
+            if cookies_path["value"]:
+                opts["cookiefile"] = cookies_path["value"]
+
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
 
-            progress_bar.value = 1
-            progress_bar.color = "#6ee7b7"
-            status_text.value  = "✅ تم التحميل بنجاح في مجلد Downloads!"
-            status_text.color  = "#6ee7b7"
+            progress_bar.value   = 1
+            progress_bar.color   = "#6ee7b7"
+            status_text.value    = "✅ تم التحميل بنجاح في مجلد Downloads!"
+            status_text.color    = "#6ee7b7"
             progress_label.value = ""
             clear_error()
 
@@ -277,7 +268,7 @@ def main(page: ft.Page):
             elif "available" in err.lower():
                 status_text.value = "❌ الفيديو غير متاح في منطقتك"
             elif "ermission" in err:
-                status_text.value = "❌ لا توجد صلاحية كتابة للتخزين"
+                status_text.value = "❌ لا توجد صلاحية تخزين"
             else:
                 status_text.value = "❌ فشل التحميل — راجع السجل أدناه"
             status_text.color  = "#f87171"
@@ -310,15 +301,15 @@ def main(page: ft.Page):
             if is_downloading["value"]:
                 return
 
-            is_downloading["value"]  = True
-            download_btn.disabled    = True
-            progress_bar.visible     = True
-            progress_bar.value       = 0
-            progress_bar.color       = "#a78bfa"
-            progress_label.visible   = True
-            progress_label.value     = "جاري الاتصال بالخادم..."
-            status_text.value        = "جاري التحميل..."
-            status_text.color        = "#fbbf24"
+            is_downloading["value"] = True
+            download_btn.disabled   = True
+            progress_bar.visible    = True
+            progress_bar.value      = 0
+            progress_bar.color      = "#a78bfa"
+            progress_label.visible  = True
+            progress_label.value    = "جاري الاتصال بالخادم..."
+            status_text.value       = "جاري التحميل..."
+            status_text.color       = "#fbbf24"
             clear_error()
             page.update()
 
@@ -333,21 +324,18 @@ def main(page: ft.Page):
 
     download_btn.on_click = on_download
 
-    # ── بناء الواجهة (محاطة بـ try-except لمنع الشاشة السوداء) ──
+    # ── بناء الواجهة الكاملة وتبديل splash ──────────────────────
     try:
         header = ft.Container(
-            content=ft.Column([
-                ft.Row([
-                    ft.Icon(ft.Icons.DOWNLOAD_FOR_OFFLINE, size=32, color="#a78bfa"),
-                    ft.Column([
-                        ft.Text("تحميل غصب", size=24,
-                                weight=ft.FontWeight.BOLD, color="#ffffff"),
-                        ft.Text("حمّل أي فيديو بسهولة وسرعة", size=11, color="#888"),
-                    ], spacing=2),
-                ], spacing=12, alignment=ft.MainAxisAlignment.CENTER),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=ft.padding.symmetric(vertical=24, horizontal=20),
-            bgcolor="#1a1a3e",
+            content=ft.Row([
+                ft.Icon(ft.icons.DOWNLOAD_FOR_OFFLINE, size=30, color="#a78bfa"),
+                ft.Column([
+                    ft.Text("تحميل غصب", size=22,
+                            weight=ft.FontWeight.BOLD, color="#ffffff"),
+                    ft.Text("حمّل أي فيديو بسهولة وسرعة", size=11, color="#888"),
+                ], spacing=2, tight=True),
+            ], spacing=10),
+            padding=ft.padding.symmetric(vertical=20, horizontal=0),
         )
 
         card = ft.Container(
@@ -357,64 +345,56 @@ def main(page: ft.Page):
                 ft.Text("جودة التحميل", size=12, color="#aaa"),
                 quality_dd,
                 ft.Text("الكوكيز (اختياري)", size=12, color="#aaa"),
-                ft.Row(
-                    [cookies_btn, cookies_label],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                perm_banner,
+                ft.Row([cookies_btn, cookies_label], spacing=8,
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                perm_text,
                 ft.Divider(height=1, color="#1e1e3e"),
-                download_btn,
+                ft.Row([download_btn]),
                 progress_bar,
                 progress_label,
                 status_text,
-            ], spacing=8),
-            margin=ft.margin.symmetric(horizontal=16, vertical=10),
-            padding=18,
+            ], spacing=8, tight=True),
+            padding=16,
             bgcolor="#13132b",
             border_radius=16,
         )
 
         tip_card = ft.Container(
             content=ft.Column([
-                ft.Text("نصائح للاستخدام", size=12, color="#a78bfa",
+                ft.Text("نصائح", size=12, color="#a78bfa",
                         weight=ft.FontWeight.BOLD),
-                ft.Text("• الفيديوهات الخاصة تحتاج ملف كوكيز بصيغة .txt", size=11, color="#888"),
-                ft.Text("• يمكن تحميل قوائم تشغيل YouTube كاملة", size=11, color="#888"),
-                ft.Text("• اختر 'صوت فقط' لاستخراج الصوت MP3", size=11, color="#888"),
-            ], spacing=5),
-            margin=ft.margin.symmetric(horizontal=16, vertical=4),
+                ft.Text("• الفيديوهات الخاصة تحتاج ملف كوكيز .txt من مجلد التنزيلات",
+                        size=11, color="#888"),
+                ft.Text("• يمكن تحميل قوائم تشغيل YouTube كاملة",
+                        size=11, color="#888"),
+                ft.Text("• اختر 'صوت فقط' لاستخراج الصوت MP3",
+                        size=11, color="#888"),
+            ], spacing=4, tight=True),
             padding=14,
             bgcolor="#0f0f22",
             border_radius=12,
-            border=ft.border.all(1, "#1e1e3e"),
         )
 
-        page.add(ft.Column(
-            [header, card, error_card, tip_card],
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-            spacing=0,
-        ))
+        # استبدال splash بالواجهة الكاملة
+        page.controls.clear()
+        page.add(header, card, error_card, tip_card)
+        page.update()
 
-        # التحقق من الصلاحيات في الخلفية بعد عرض الواجهة
+        # فحص الصلاحيات في الخلفية بعد عرض الواجهة
         threading.Thread(target=check_storage_perm, daemon=True).start()
 
     except Exception as ex:
-        # بدلاً من الشاشة السوداء — نعرض الخطأ للمستخدم
+        # عرض الخطأ بدلاً من الشاشة السوداء
         tb = traceback.format_exc()
         page.controls.clear()
-        page.bgcolor = "#0d0d1a"
-        page.add(ft.Column([
-            ft.Icon(ft.Icons.WARNING, size=48, color="#f87171"),
-            ft.Text("خطأ في تهيئة التطبيق", size=18, color="#f87171",
-                    weight=ft.FontWeight.BOLD),
-            ft.Text(f"{type(ex).__name__}: {ex}", size=13, color="#fca5a5"),
+        page.add(
+            ft.Icon(ft.icons.WARNING_ROUNDED, size=48, color="#f87171"),
+            ft.Text("خطأ في تهيئة التطبيق", size=16,
+                    color="#f87171", weight=ft.FontWeight.BOLD),
+            ft.Text(f"{type(ex).__name__}: {ex}", size=12, color="#fca5a5"),
             ft.Divider(color="#333"),
-            ft.Text("تفاصيل الخطأ:", size=11, color="#888"),
-            ft.Text(tb[-800:], size=10, color="#666", selectable=True),
-        ], scroll=ft.ScrollMode.AUTO, spacing=12, expand=True,
-           horizontal_alignment=ft.CrossAxisAlignment.CENTER))
+            ft.Text(tb[-1000:], size=10, color="#666", selectable=True),
+        )
         page.update()
 
 
