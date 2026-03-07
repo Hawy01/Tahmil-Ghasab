@@ -2,9 +2,56 @@ import flet as ft
 import threading
 import traceback
 import os
+import sys
+import datetime
 
+# ── سجل الأخطاء في ملف خارجي ────────────────────────────────────
+# يُكتب قبل أي شيء آخر حتى نلتقط الأخطاء المبكرة
+
+_LOG_PATHS = [
+    "/storage/emulated/0/Download/ghasab_log.txt",
+    "/sdcard/Download/ghasab_log.txt",
+    os.path.join(os.path.dirname(__file__), "ghasab_log.txt"),
+    "/data/local/tmp/ghasab_log.txt",
+]
+_LOG_FILE = None
+
+for _p in _LOG_PATHS:
+    try:
+        os.makedirs(os.path.dirname(_p), exist_ok=True)
+        with open(_p, "a", encoding="utf-8") as _f:
+            _f.write(f"\n{'='*50}\n")
+            _f.write(f"بدء التشغيل: {datetime.datetime.now()}\n")
+            _f.write(f"Python: {sys.version}\n")
+            _f.write(f"CWD: {os.getcwd()}\n")
+        _LOG_FILE = _p
+        break
+    except Exception:
+        continue
+
+
+def log(msg: str):
+    ts = datetime.datetime.now().strftime("%H:%M:%S")
+    line = f"[{ts}] {msg}\n"
+    if _LOG_FILE:
+        try:
+            with open(_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(line)
+        except Exception:
+            pass
+
+
+def log_exc(context: str, exc: Exception):
+    tb = traceback.format_exc()
+    log(f"ERROR in {context}: {type(exc).__name__}: {exc}\n{tb}")
+
+
+# ── إعدادات التطبيق ──────────────────────────────────────────────
 DOWNLOAD_DIR = "/storage/emulated/0/Download"
 APP_PACKAGE  = "com.ghasab.downloader"
+
+log(f"LOG_FILE={_LOG_FILE}")
+log(f"DOWNLOAD_DIR exists={os.path.exists(DOWNLOAD_DIR)}")
 
 
 def get_ffmpeg_path():
@@ -15,6 +62,7 @@ def get_ffmpeg_path():
         f"/data/user/0/{APP_PACKAGE}/files/assets/ffmpeg",
     ]
     for p in candidates:
+        log(f"ffmpeg check: {p} exists={os.path.isfile(p)}")
         if os.path.isfile(p):
             try:
                 os.chmod(p, 0o755)
@@ -25,19 +73,46 @@ def get_ffmpeg_path():
 
 
 def main(page: ft.Page):
-    # ── أول شيء: عرض نص فوري لمنع الشاشة السوداء ───────────────
+    log("main() called")
+
+    # ── الإعدادات الأساسية ───────────────────────────────────────
     page.title      = "تحميل غصب"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor    = "#0d0d1a"
     page.padding    = 16
-    page.scroll     = ft.ScrollMode.AUTO   # scroll على Page مباشرة
+    page.scroll     = ft.ScrollMode.AUTO
 
-    splash = ft.Text("جاري تهيئة التطبيق...", color="#aaa", size=14)
+    # ── Splash فوري — أول شيء يظهر على الشاشة ──────────────────
+    splash = ft.Column([
+        ft.Text("تحميل غصب", size=22, weight=ft.FontWeight.BOLD, color="#a78bfa"),
+        ft.Text("جاري التهيئة...", size=14, color="#aaa"),
+        ft.ProgressRing(width=32, height=32, stroke_width=3, color="#5c5cff"),
+    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12)
+
     page.add(splash)
-    page.update()   # ← يُظهر شيئاً فوراً قبل أي عملية ثقيلة
+    page.update()
+    log("splash shown")
 
-    # ── سجل الأخطاء ──────────────────────────────────────────────
-    error_log = ft.Text("", size=11, color="#fca5a5", selectable=True)
+    # ── عرض خطأ فادح ─────────────────────────────────────────────
+    def fatal_error(context: str, exc: Exception):
+        tb = traceback.format_exc()
+        log_exc(context, exc)
+        page.controls.clear()
+        page.add(
+            ft.Text("خطأ في التطبيق", size=18, color="#f87171",
+                    weight=ft.FontWeight.BOLD),
+            ft.Text(f"{type(exc).__name__}: {exc}", size=12, color="#fca5a5"),
+            ft.Divider(color="#333"),
+            ft.Text(
+                f"ملف السجل:\n{_LOG_FILE or 'غير متاح'}",
+                size=11, color="#60a5fa", selectable=True,
+            ),
+            ft.Text(tb[-800:], size=10, color="#666", selectable=True),
+        )
+        page.update()
+
+    # ── سجل الأخطاء المرئي في الواجهة ───────────────────────────
+    error_log  = ft.Text("", size=11, color="#fca5a5", selectable=True)
     error_card = ft.Container(
         content=ft.Column([
             ft.Row([
@@ -45,8 +120,12 @@ def main(page: ft.Page):
                 ft.Text("سجل الأخطاء", size=12, color="#f87171",
                         weight=ft.FontWeight.BOLD),
             ], spacing=6),
+            ft.Text(
+                f"ملف السجل الكامل: {_LOG_FILE or 'غير متاح'}",
+                size=10, color="#60a5fa", selectable=True,
+            ),
             error_log,
-        ], spacing=6),
+        ], spacing=4),
         padding=12,
         bgcolor="#1a0808",
         border_radius=10,
@@ -55,7 +134,8 @@ def main(page: ft.Page):
 
     def show_error(context: str, exc: Exception):
         tb = traceback.format_exc()
-        error_log.value   = f"[{context}]\n{type(exc).__name__}: {exc}\n\n{tb[-600:]}"
+        log_exc(context, exc)
+        error_log.value    = f"[{context}]\n{type(exc).__name__}: {exc}\n\n{tb[-500:]}"
         error_card.visible = True
         try:
             page.update()
@@ -95,21 +175,14 @@ def main(page: ft.Page):
     cookies_label = ft.Text("لم يتم اختيار ملف كوكيز", size=12, color="#888")
 
     progress_bar = ft.ProgressBar(
-        value=0,
-        bgcolor="#1a1a2e",
-        color="#a78bfa",
-        visible=False,
+        value=0, bgcolor="#1a1a2e", color="#a78bfa", visible=False,
     )
-
     progress_label = ft.Text("", size=11, color="#a78bfa", visible=False)
 
     status_text = ft.Text(
-        "جاهز للتحميل ✓",
-        size=13,
-        color="#6ee7b7",
+        "جاهز للتحميل ✓", size=13, color="#6ee7b7",
         text_align=ft.TextAlign.CENTER,
     )
-
     perm_text = ft.Text("", size=11, color="#fbbf24")
 
     download_btn = ft.ElevatedButton(
@@ -124,7 +197,7 @@ def main(page: ft.Page):
         ),
     )
 
-    # ── FilePicker للكوكيز ────────────────────────────────────────
+    # ── FilePicker ────────────────────────────────────────────────
     def on_cookies_picked(e: ft.FilePickerResultEvent):
         try:
             if e.files:
@@ -132,6 +205,7 @@ def main(page: ft.Page):
                 cookies_path["value"] = f.path
                 cookies_label.value   = f"✅ {f.name}"
                 cookies_label.color   = "#6ee7b7"
+                log(f"cookies picked: {f.path}")
             else:
                 cookies_path["value"] = None
                 cookies_label.value   = "لم يتم اختيار ملف كوكيز"
@@ -167,7 +241,9 @@ def main(page: ft.Page):
 
     # ── فحص صلاحية التخزين ──────────────────────────────────────
     def check_storage_perm():
+        log("checking storage perm...")
         if page.platform != ft.PagePlatform.ANDROID:
+            log("not android, skip perm check")
             return
         try:
             os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -177,19 +253,22 @@ def main(page: ft.Page):
             os.remove(test)
             perm_text.value = "✅ صلاحية التخزين ممنوحة"
             perm_text.color = "#6ee7b7"
-        except PermissionError:
+            log("storage perm: OK")
+        except PermissionError as ex:
             perm_text.value = "⚠️ لا توجد صلاحية تخزين — افتح إعدادات التطبيق"
             perm_text.color = "#f87171"
+            log(f"storage perm: DENIED - {ex}")
             try:
                 os.system(
-                    "am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"
+                    "am start -a android.settings.APPLICATION_DETAILS_SETTINGS"
                     f" -d package:{APP_PACKAGE} > /dev/null 2>&1 &"
                 )
             except Exception:
                 pass
         except Exception as ex:
-            perm_text.value = f"⚠️ تحقق من الصلاحيات: {ex}"
+            perm_text.value = f"⚠️ خطأ في فحص الصلاحية"
             perm_text.color = "#fbbf24"
+            log_exc("check_storage_perm", ex)
         try:
             page.update()
         except Exception:
@@ -206,9 +285,11 @@ def main(page: ft.Page):
                 pct        = (downloaded / total) if total else 0
                 speed_mb   = speed / 1_048_576 if speed else 0
                 progress_bar.value   = pct
-                progress_label.value = f"{pct*100:.0f}%  ·  {speed_mb:.1f} MB/s  ·  ETA: {eta}ث"
-                status_text.value    = "جاري التحميل..."
-                status_text.color    = "#fbbf24"
+                progress_label.value = (
+                    f"{pct*100:.0f}%  ·  {speed_mb:.1f} MB/s  ·  ETA: {eta}ث"
+                )
+                status_text.value = "جاري التحميل..."
+                status_text.color = "#fbbf24"
                 page.update()
             elif d["status"] == "finished":
                 progress_bar.value = 1
@@ -219,11 +300,14 @@ def main(page: ft.Page):
             pass
 
     def do_download(url: str, quality: str):
+        log(f"do_download: url={url} quality={quality}")
         try:
-            import yt_dlp  # استيراد متأخر لتفادي تجميد شاشة البدء
+            import yt_dlp
+            log("yt_dlp imported OK")
 
             save_path  = DOWNLOAD_DIR if os.path.isdir(DOWNLOAD_DIR) else "./"
             ffmpeg_bin = get_ffmpeg_path()
+            log(f"save_path={save_path} ffmpeg={ffmpeg_bin}")
 
             if quality == "audio":
                 fmt  = "bestaudio/best"
@@ -235,14 +319,14 @@ def main(page: ft.Page):
                 post = []
 
             opts = {
-                "format":             fmt,
-                "outtmpl":            f"{save_path}/%(title)s.%(ext)s",
-                "merge_output_format":"mp4",
-                "postprocessors":     post,
-                "noplaylist":         False,
-                "quiet":              True,
-                "no_warnings":        True,
-                "progress_hooks":     [progress_hook],
+                "format":              fmt,
+                "outtmpl":             f"{save_path}/%(title)s.%(ext)s",
+                "merge_output_format": "mp4",
+                "postprocessors":      post,
+                "noplaylist":          False,
+                "quiet":               True,
+                "no_warnings":         True,
+                "progress_hooks":      [progress_hook],
             }
             if ffmpeg_bin:
                 opts["ffmpeg_location"] = ffmpeg_bin
@@ -252,6 +336,7 @@ def main(page: ft.Page):
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
 
+            log("download complete")
             progress_bar.value   = 1
             progress_bar.color   = "#6ee7b7"
             status_text.value    = "✅ تم التحميل بنجاح في مجلد Downloads!"
@@ -270,7 +355,7 @@ def main(page: ft.Page):
             elif "ermission" in err:
                 status_text.value = "❌ لا توجد صلاحية تخزين"
             else:
-                status_text.value = "❌ فشل التحميل — راجع السجل أدناه"
+                status_text.value = "❌ فشل التحميل — راجع السجل"
             status_text.color  = "#f87171"
             progress_bar.color = "#f87171"
             show_error("do_download", e)
@@ -324,7 +409,8 @@ def main(page: ft.Page):
 
     download_btn.on_click = on_download
 
-    # ── بناء الواجهة الكاملة وتبديل splash ──────────────────────
+    # ── بناء الواجهة الكاملة ─────────────────────────────────────
+    log("building UI...")
     try:
         header = ft.Container(
             content=ft.Row([
@@ -333,9 +419,9 @@ def main(page: ft.Page):
                     ft.Text("تحميل غصب", size=22,
                             weight=ft.FontWeight.BOLD, color="#ffffff"),
                     ft.Text("حمّل أي فيديو بسهولة وسرعة", size=11, color="#888"),
-                ], spacing=2, tight=True),
+                ], spacing=2),
             ], spacing=10),
-            padding=ft.padding.symmetric(vertical=20, horizontal=0),
+            padding=ft.padding.only(bottom=8),
         )
 
         card = ft.Container(
@@ -353,7 +439,7 @@ def main(page: ft.Page):
                 progress_bar,
                 progress_label,
                 status_text,
-            ], spacing=8, tight=True),
+            ], spacing=8),
             padding=16,
             bgcolor="#13132b",
             border_radius=16,
@@ -365,37 +451,30 @@ def main(page: ft.Page):
                         weight=ft.FontWeight.BOLD),
                 ft.Text("• الفيديوهات الخاصة تحتاج ملف كوكيز .txt من مجلد التنزيلات",
                         size=11, color="#888"),
-                ft.Text("• يمكن تحميل قوائم تشغيل YouTube كاملة",
-                        size=11, color="#888"),
-                ft.Text("• اختر 'صوت فقط' لاستخراج الصوت MP3",
-                        size=11, color="#888"),
-            ], spacing=4, tight=True),
+                ft.Text("• يمكن تحميل قوائم تشغيل YouTube كاملة", size=11, color="#888"),
+                ft.Text("• اختر 'صوت فقط' لاستخراج MP3", size=11, color="#888"),
+                ft.Text(f"• ملف السجل: {_LOG_FILE or 'غير متاح'}",
+                        size=10, color="#555", selectable=True),
+            ], spacing=4),
             padding=14,
             bgcolor="#0f0f22",
             border_radius=12,
         )
 
-        # استبدال splash بالواجهة الكاملة
+        log("UI built OK, switching from splash...")
         page.controls.clear()
         page.add(header, card, error_card, tip_card)
         page.update()
+        log("UI displayed OK")
 
-        # فحص الصلاحيات في الخلفية بعد عرض الواجهة
         threading.Thread(target=check_storage_perm, daemon=True).start()
 
     except Exception as ex:
-        # عرض الخطأ بدلاً من الشاشة السوداء
-        tb = traceback.format_exc()
-        page.controls.clear()
-        page.add(
-            ft.Icon(ft.icons.WARNING_ROUNDED, size=48, color="#f87171"),
-            ft.Text("خطأ في تهيئة التطبيق", size=16,
-                    color="#f87171", weight=ft.FontWeight.BOLD),
-            ft.Text(f"{type(ex).__name__}: {ex}", size=12, color="#fca5a5"),
-            ft.Divider(color="#333"),
-            ft.Text(tb[-1000:], size=10, color="#666", selectable=True),
-        )
-        page.update()
+        fatal_error("build_ui", ex)
 
 
-ft.app(target=main)
+try:
+    log("calling ft.app()...")
+    ft.app(target=main)
+except Exception as e:
+    log_exc("ft.app()", e)
