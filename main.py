@@ -195,7 +195,7 @@ def main(page: ft.Page):
 
     try:
         progress_bar = ft.ProgressBar(
-            value=0, bgcolor="#1a1a2e", color="#a78bfa", visible=False)
+            value=0, bgcolor="#1a1a2e", bar_color="#a78bfa", visible=False)
     except Exception as ex:
         log_exc("progress_bar", ex)
         try:
@@ -208,11 +208,8 @@ def main(page: ft.Page):
         download_btn = ft.ElevatedButton(
             text="تحميل غصب",
             icon=ft.Icons.DOWNLOAD,
-            style=ft.ButtonStyle(
-                bgcolor="#5c5cff",
-                color="#ffffff",
-                shape=ft.RoundedRectangleBorder(radius=14),
-            ),
+            bgcolor="#5c5cff",
+            color="#ffffff",
         )
     except Exception as ex:
         log_exc("download_btn", ex)
@@ -266,11 +263,8 @@ def main(page: ft.Page):
             text="إضافة كوكيز",
             icon=ft.Icons.COOKIE,
             on_click=pick_cookies,
-            style=ft.ButtonStyle(
-                bgcolor="#1e1e3e",
-                color="#a78bfa",
-                shape=ft.RoundedRectangleBorder(radius=12),
-            ),
+            bgcolor="#1e1e3e",
+            color="#a78bfa",
         )
     except Exception as ex:
         log_exc("cookies_btn", ex)
