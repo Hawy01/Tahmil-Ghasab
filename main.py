@@ -106,11 +106,16 @@ def main(page: ft.Page):
         ],
     )
 
-    status = ft.Text("جاهز للتحميل ✓", size=13, color="#6ee7b7")
-    bar    = ft.ProgressBar(value=0, visible=False)
-    blabel = ft.Text("", size=11, color="#aaaaaa", visible=False)
-    cklab  = ft.Text("لا يوجد ملف كوكيز", size=11, color="#888888")
-    perm   = ft.Text("", size=11, color="#fbbf24")
+    status   = ft.Text("جاهز للتحميل ✓", size=13, color="#6ee7b7")
+    bar      = ft.ProgressBar(value=0, visible=False)
+    blabel   = ft.Text("", size=11, color="#aaaaaa", visible=False)
+    perm     = ft.Text("", size=11, color="#fbbf24")
+    ck_field = ft.TextField(
+        label="مسار ملف الكوكيز (اختياري)",
+        hint_text="/storage/emulated/0/Download/cookies.txt",
+        filled=True,
+        border_color="#444466",
+    )
 
     # ── Log dialog ────────────────────────────────────────────────
     def show_log(_):
@@ -151,31 +156,6 @@ def main(page: ft.Page):
                 page.update()
             except Exception:
                 pass
-
-    # ── FilePicker ────────────────────────────────────────────────
-    def on_file(e):
-        try:
-            if e.files:
-                state["cookies"] = e.files[0].path
-                cklab.value      = "✅ " + e.files[0].name
-                cklab.color      = "#6ee7b7"
-                log("cookies: " + str(e.files[0].path))
-            else:
-                state["cookies"] = None
-                cklab.value      = "لا يوجد ملف كوكيز"
-                cklab.color      = "#888888"
-            page.update()
-        except Exception as ex:
-            log_exc("on_file", ex)
-
-    try:
-        picker = ft.FilePicker()
-        picker.on_result = on_file
-        page.overlay.append(picker)
-        log("picker added")
-    except Exception as ex:
-        log_exc("picker_init", ex)
-        picker = None
 
     # ── Download logic ────────────────────────────────────────────
     def do_dl(url, qual):
@@ -227,8 +207,9 @@ def main(page: ft.Page):
                 "progress_hooks":      [hook],
                 "noplaylist":          False,
             }
-            if ff:                  opts["ffmpeg_location"] = ff
-            if state["cookies"]:    opts["cookiefile"]      = state["cookies"]
+            ck_path = (ck_field.value or "").strip()
+            if ff:      opts["ffmpeg_location"] = ff
+            if ck_path: opts["cookiefile"]      = ck_path
 
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
@@ -291,23 +272,8 @@ def main(page: ft.Page):
             target=do_dl, args=(url, quality.value), daemon=True
         ).start()
 
-    def pick_ck(_):
-        if picker is None:
-            cklab.value = "FilePicker غير متاح"
-            page.update()
-            return
-        try:
-            picker.pick_files(
-                dialog_title="اختر ملف كوكيز .txt",
-                allowed_extensions=["txt"],
-                allow_multiple=False,
-            )
-        except Exception as ex:
-            log_exc("pick_ck", ex)
-
-    dl_btn = ft.ElevatedButton("تحميل غصب",    on_click=on_dl)
-    ck_btn = ft.ElevatedButton("إضافة كوكيز", on_click=pick_ck)
-    lg_btn = ft.TextButton("📋 سجل",          on_click=show_log)
+    dl_btn = ft.ElevatedButton("تحميل غصب", on_click=on_dl)
+    lg_btn = ft.TextButton("📋 سجل",       on_click=show_log)
 
     # ── Build page ────────────────────────────────────────────────
     log("building page...")
@@ -318,7 +284,7 @@ def main(page: ft.Page):
         ft.Divider(color="#222244"),
         url_in,
         quality,
-        ft.Row(controls=[ck_btn, cklab], spacing=8),
+        ck_field,
         perm,
         dl_btn,
         bar,
