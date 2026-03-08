@@ -32,15 +32,57 @@ jobs:
       - name: Install Dependencies
         run: pip install flet yt-dlp
 
-      - name: Patch flet AndroidManifest template (requestLegacyExternalStorage)
+      - name: Patch flet AndroidManifest template (permissions + legacyStorage)
         run: |
           TEMPLATE=$(python -c "import flet; import os; print(os.path.dirname(flet.__file__))")
+          echo "Flet template dir: $TEMPLATE"
           find "$TEMPLATE" -name "AndroidManifest.xml*" | while read f; do
-            sed -i 's/<application /<application android:requestLegacyExternalStorage="true" /g' "$f" || true
+            echo "Patching: $f"
+            python3 - "$f" <<'PYEOF'
+          import sys, re
+
+          path = sys.argv[1]
+          with open(path, 'r', encoding='utf-8') as fh:
+              content = fh.read()
+
+          PERMS = """    <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+              <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+          """
+
+          # حقن الصلاحيات قبل <application إن لم تكن موجودة
+          if 'MANAGE_EXTERNAL_STORAGE' not in content:
+              content = re.sub(r'(<application\s)', PERMS + r'\n    \1', content, count=1)
+
+          # إضافة requestLegacyExternalStorage
+          if 'requestLegacyExternalStorage' not in content:
+              content = content.replace('<application ', '<application android:requestLegacyExternalStorage="true" ', 1)
+
+          with open(path, 'w', encoding='utf-8') as fh:
+              fh.write(content)
+          print("Done:", path)
+          PYEOF
           done
 
       - name: Build APK
         run: yes | flet build apk
+
+      - name: Verify APK permissions
+        run: |
+          APK=$(find build/apk -name "*.apk" | head -1)
+          echo "APK: $APK"
+          if command -v aapt &>/dev/null; then
+            aapt dump permissions "$APK" || true
+          fi
+          # استخراج AndroidManifest.xml من APK
+          python3 -c "
+          import zipfile, sys
+          apk = sys.argv[1]
+          with zipfile.ZipFile(apk) as z:
+              names = z.namelist()
+              print('APK files:', [n for n in names if 'Manifest' in n or 'manifest' in n])
+          " "$APK" || true
 
       - name: Upload to GitHub Releases
         id: create_release
