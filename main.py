@@ -51,26 +51,33 @@ def log_exc(ctx, ex):
 
 # ── Constants ─────────────────────────────────────────────────────────
 SAVE_DIR = "/storage/emulated/0/Download"
-PKG      = "com.flet.tahmil_ghasab"
+PKG      = "com.ghasab.downloader"
 
 log("module loaded | log={}".format(_path or "NONE"))
 
 
-def get_ffmpeg():
-    for p in [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "ffmpeg"),
-        "/data/user/0/{}/files/assets/ffmpeg".format(PKG),
-        "/data/data/{}/files/assets/ffmpeg".format(PKG),
-    ]:
-        if os.path.isfile(p):
-            try:
-                os.chmod(p, 0o755)
-            except Exception:
-                pass
-            log("ffmpeg: " + p)
+def get_save_dir():
+    """Returns a writable directory — tries Downloads first, then app-specific."""
+    candidates = [
+        "/storage/emulated/0/Download",
+        "/sdcard/Download",
+        "/sdcard/Android/data/{}/files".format(PKG),
+        os.path.join(os.environ.get("HOME", ""), "files"),
+        os.getcwd(),
+    ]
+    for p in candidates:
+        try:
+            os.makedirs(p, exist_ok=True)
+            test = os.path.join(p, ".wt")
+            with open(test, "w") as f:
+                f.write("ok")
+            os.remove(test)
+            log("save_dir: " + p)
             return p
-    log("ffmpeg: not found")
-    return None
+        except Exception:
+            continue
+    log("save_dir: fallback cwd")
+    return os.getcwd()
 
 
 # ── Main ──────────────────────────────────────────────────────────────
@@ -162,18 +169,18 @@ def main(page: ft.Page):
         log("dl start: {} [{}]".format(url, qual))
         try:
             import yt_dlp
-            sv = SAVE_DIR if os.path.isdir(SAVE_DIR) else os.getcwd()
-            ff = get_ffmpeg()
-            log("save_dir={} ffmpeg={}".format(sv, ff))
+            sv = get_save_dir()
+            log("save_dir={}".format(sv))
 
+            # بدون ffmpeg: نستخدم تنسيقات لا تحتاج دمجاً
             if qual == "audio":
-                fmt  = "bestaudio/best"
-                post = [{"key": "FFmpegExtractAudio",
-                         "preferredcodec": "mp3", "preferredquality": "192"}]
+                fmt  = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio"
+                post = []
             elif qual == "best":
-                fmt, post = "bestvideo+bestaudio/best", []
+                fmt  = "best[ext=mp4]/best"
+                post = []
             else:
-                fmt  = "bestvideo[height<={}]+bestaudio/best".format(qual)
+                fmt  = "best[height<={}][ext=mp4]/best[height<={}]".format(qual, qual)
                 post = []
 
             def hook(d):
@@ -198,18 +205,16 @@ def main(page: ft.Page):
                     pass
 
             opts = {
-                "format":              fmt,
-                "outtmpl":             "{}/%(title)s.%(ext)s".format(sv),
-                "merge_output_format": "mp4",
-                "postprocessors":      post,
-                "quiet":               True,
-                "no_warnings":         True,
-                "progress_hooks":      [hook],
-                "noplaylist":          False,
+                "format":         fmt,
+                "outtmpl":        "{}/%(title)s.%(ext)s".format(sv),
+                "postprocessors": post,
+                "quiet":          True,
+                "no_warnings":    True,
+                "progress_hooks": [hook],
+                "noplaylist":     False,
             }
             ck_path = (ck_field.value or "").strip()
-            if ff:      opts["ffmpeg_location"] = ff
-            if ck_path: opts["cookiefile"]      = ck_path
+            if ck_path: opts["cookiefile"] = ck_path
 
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
@@ -305,19 +310,17 @@ def main(page: ft.Page):
 
     # ── Storage permission check ──────────────────────────────────
     def chk_perm():
-        try:
-            os.makedirs(SAVE_DIR, exist_ok=True)
-            t = os.path.join(SAVE_DIR, ".wt")
-            with open(t, "w") as f:
-                f.write("ok")
-            os.remove(t)
-            perm.value = "✅ صلاحية التخزين: ممنوحة"
+        sv = get_save_dir()
+        if sv == os.getcwd():
+            perm.value = "⚠️ التخزين: سيُحفظ في المجلد الداخلي"
+            perm.color = "#fbbf24"
+        elif "/Download" in sv:
+            perm.value = "✅ التخزين: مجلد Downloads"
             perm.color = "#6ee7b7"
-            log("perm: OK")
-        except Exception as ex:
-            perm.value = "⚠️ لا توجد صلاحية تخزين — افتح الإعدادات"
-            perm.color = "#f87171"
-            log_exc("chk_perm", ex)
+        else:
+            perm.value = "✅ التخزين: " + sv
+            perm.color = "#6ee7b7"
+        log("chk_perm: " + sv)
         try:
             page.update()
         except Exception:
