@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'claude/**'
   workflow_dispatch:
 
 jobs:
@@ -31,6 +32,13 @@ jobs:
       - name: Install Dependencies
         run: pip install flet yt-dlp
 
+      - name: Patch flet AndroidManifest template (requestLegacyExternalStorage)
+        run: |
+          TEMPLATE=$(python -c "import flet; import os; print(os.path.dirname(flet.__file__))")
+          find "$TEMPLATE" -name "AndroidManifest.xml*" | while read f; do
+            sed -i 's/<application /<application android:requestLegacyExternalStorage="true" /g' "$f" || true
+          done
+
       - name: Build APK
         run: |
           yes | flet build apk \
@@ -40,14 +48,6 @@ jobs:
             --android-permissions android.permission.WRITE_EXTERNAL_STORAGE \
             --android-permissions android.permission.READ_EXTERNAL_STORAGE \
             --android-permissions android.permission.MANAGE_EXTERNAL_STORAGE
-
-      - name: Patch requestLegacyExternalStorage
-        run: |
-          find . -path "*/main/AndroidManifest.xml" \
-               ! -path "*/build/apk/*" \
-               -exec sed -i \
-                 's/<application /<application android:requestLegacyExternalStorage="true" /g' \
-                 {} + || true
 
       - name: Upload to GitHub Releases
         id: create_release
