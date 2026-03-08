@@ -59,11 +59,13 @@ log("module loaded | log={}".format(_path or "NONE"))
 def get_save_dir():
     """Returns a writable absolute directory — tries Downloads first, then internal."""
     # اكتشاف بطاقة SD تلقائياً
-    sd_candidates = []
+    sd_dl = []        # /storage/XXXX/Download  ← يحتاج MANAGE_EXTERNAL_STORAGE
+    sd_app = []       # /storage/XXXX/Android/data/<pkg>/files ← لا يحتاج صلاحية
     try:
         for d in os.listdir("/storage"):
             if d not in ("emulated", "self"):
-                sd_candidates.append("/storage/{}/Download".format(d))
+                sd_dl.append("/storage/{}/Download".format(d))
+                sd_app.append("/storage/{}/Android/data/{}/files".format(d, PKG))
     except Exception:
         pass
 
@@ -73,10 +75,14 @@ def get_save_dir():
     internal = os.path.join(home, "files") if home else os.path.join(cwd, "files")
 
     candidates = [
+        # أولاً: Download (يحتاج MANAGE_EXTERNAL_STORAGE)
         "/storage/emulated/0/Download",
         "/sdcard/Download",
-    ] + sd_candidates + [
+    ] + sd_dl + [
+        # ثانياً: مجلد التطبيق على SD (لا يحتاج صلاحية خاصة)
+    ] + sd_app + [
         "/sdcard/Android/data/{}/files".format(PKG),
+        # أخيراً: التخزين الداخلي
         internal,
         cwd,
     ]
@@ -316,14 +322,22 @@ def main(page: ft.Page):
     def chk_perm():
         sv = get_save_dir()
         if "/Download" in sv:
-            perm.value = "✅ التخزين: مجلد Downloads"
+            perm.value = "✅ التخزين: " + sv
             perm.color = "#6ee7b7"
         elif "/Android/data/" in sv:
-            perm.value = "⚠️ يُحفظ في: " + sv + "\nللحفظ في Downloads: الإعدادات ← التطبيقات ← تحميل غصب ← الصلاحيات ← الوصول لكل الملفات"
+            perm.value = (
+                "⚠️ يُحفظ في SD: " + sv + "\n"
+                "لتفعيل Downloads: الإعدادات ← التطبيقات ← تحميل غصب\n"
+                "← الصلاحيات ← الوصول لكل الملفات ← تفعيل"
+            )
             perm.color = "#fbbf24"
         else:
-            perm.value = "⚠️ التخزين: " + sv
-            perm.color = "#fbbf24"
+            perm.value = (
+                "⚠️ يُحفظ في: " + sv + "\n"
+                "لتفعيل Downloads: الإعدادات ← التطبيقات ← تحميل غصب\n"
+                "← الصلاحيات ← الوصول لكل الملفات ← تفعيل"
+            )
+            perm.color = "#f87171"
         log("chk_perm: " + sv)
         try:
             page.update()
