@@ -40,14 +40,7 @@ jobs:
           done
 
       - name: Build APK
-        run: |
-          yes | flet build apk \
-            --org com.ghasab \
-            --project downloader \
-            --android-permissions android.permission.INTERNET \
-            --android-permissions android.permission.WRITE_EXTERNAL_STORAGE \
-            --android-permissions android.permission.READ_EXTERNAL_STORAGE \
-            --android-permissions android.permission.MANAGE_EXTERNAL_STORAGE
+        run: yes | flet build apk
 
       - name: Upload to GitHub Releases
         id: create_release
