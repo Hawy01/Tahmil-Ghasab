@@ -57,13 +57,28 @@ log("module loaded | log={}".format(_path or "NONE"))
 
 
 def get_save_dir():
-    """Returns a writable directory — tries Downloads first, then app-specific."""
+    """Returns a writable absolute directory — tries Downloads first, then internal."""
+    # اكتشاف بطاقة SD تلقائياً
+    sd_candidates = []
+    try:
+        for d in os.listdir("/storage"):
+            if d not in ("emulated", "self"):
+                sd_candidates.append("/storage/{}/Download".format(d))
+    except Exception:
+        pass
+
+    # مسار الملفات الداخلية المطلق
+    cwd = os.path.abspath(os.getcwd())
+    home = os.environ.get("HOME", "")
+    internal = os.path.join(home, "files") if home else os.path.join(cwd, "files")
+
     candidates = [
         "/storage/emulated/0/Download",
         "/sdcard/Download",
+    ] + sd_candidates + [
         "/sdcard/Android/data/{}/files".format(PKG),
-        os.path.join(os.environ.get("HOME", ""), "files"),
-        os.getcwd(),
+        internal,
+        cwd,
     ]
     for p in candidates:
         try:
@@ -73,11 +88,12 @@ def get_save_dir():
                 f.write("ok")
             os.remove(test)
             log("save_dir: " + p)
-            return p
-        except Exception:
+            return os.path.abspath(p)
+        except Exception as e:
+            log("save_dir skip {}: {}".format(p, e))
             continue
-    log("save_dir: fallback cwd")
-    return os.getcwd()
+    log("save_dir: fallback cwd=" + cwd)
+    return cwd
 
 
 # ── Main ──────────────────────────────────────────────────────────────
@@ -195,13 +211,20 @@ def main(page: ft.Page):
                 "noplaylist":     False,
             }
             ck_path = (ck_field.value or "").strip()
-            if ck_path: opts["cookiefile"] = ck_path
+            if ck_path:
+                if os.path.isfile(ck_path):
+                    opts["cookiefile"] = ck_path
+                else:
+                    log("cookie path invalid (not a file): " + ck_path)
+                    status.value = "⚠️ مسار الكوكيز غير صحيح — يجب أن يكون ملف .txt"
+                    status.color = "#fbbf24"
+                    page.update()
 
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
 
-            log("dl complete ✓")
-            status.value = "✅ تم التحميل في مجلد Downloads!"
+            log("dl complete ✓ → " + sv)
+            status.value = "✅ تم التحميل!\nالمجلد: " + sv
             status.color = "#6ee7b7"
             bar.value    = 1
 
