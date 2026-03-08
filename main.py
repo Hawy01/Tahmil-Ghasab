@@ -51,7 +51,7 @@ def log_exc(ctx, ex):
 
 # ── Constants ─────────────────────────────────────────────────────────
 SAVE_DIR = "/storage/emulated/0/Download"
-PKG      = "com.ghasab.downloader"
+PKG      = "com.ghasab.tahmil_ghasab"
 
 log("module loaded | log={}".format(_path or "NONE"))
 
@@ -125,44 +125,25 @@ def main(page: ft.Page):
     )
 
     # ── Log dialog ────────────────────────────────────────────────
+    log_dlg = ft.AlertDialog(
+        title=ft.Text("سجل الأحداث"),
+        content=ft.Container(
+            content=ft.Column(controls=[], scroll=ft.ScrollMode.AUTO),
+            width=320, height=380,
+        ),
+        actions=[ft.TextButton("إغلاق", on_click=lambda _: _close_dlg())],
+    )
+    page.overlay.append(log_dlg)
+
     def show_log(_):
         txt = "\n".join(_buf[-150:]) if _buf else "السجل فارغ"
-        dlg = ft.AlertDialog(
-            title=ft.Text("سجل الأخطاء"),
-            content=ft.Container(
-                content=ft.Column(
-                    controls=[ft.Text(txt, size=10, selectable=True)],
-                    scroll=ft.ScrollMode.AUTO,
-                ),
-                width=320,
-                height=380,
-            ),
-            actions=[
-                ft.TextButton(
-                    "إغلاق",
-                    on_click=lambda _: _close_dlg(dlg),
-                ),
-            ],
-        )
-        try:
-            page.open(dlg)
-        except Exception:
-            try:
-                page.dialog = dlg
-                dlg.open = True
-                page.update()
-            except Exception as ex:
-                log_exc("show_log.open", ex)
+        log_dlg.content.content.controls = [ft.Text(txt, size=10, selectable=True)]
+        log_dlg.open = True
+        page.update()
 
-    def _close_dlg(dlg):
-        try:
-            page.close(dlg)
-        except Exception:
-            try:
-                dlg.open = False
-                page.update()
-            except Exception:
-                pass
+    def _close_dlg():
+        log_dlg.open = False
+        page.update()
 
     # ── Download logic ────────────────────────────────────────────
     def do_dl(url, qual):
@@ -311,15 +292,15 @@ def main(page: ft.Page):
     # ── Storage permission check ──────────────────────────────────
     def chk_perm():
         sv = get_save_dir()
-        if sv == os.getcwd():
-            perm.value = "⚠️ التخزين: سيُحفظ في المجلد الداخلي"
-            perm.color = "#fbbf24"
-        elif "/Download" in sv:
+        if "/Download" in sv:
             perm.value = "✅ التخزين: مجلد Downloads"
             perm.color = "#6ee7b7"
+        elif "/Android/data/" in sv:
+            perm.value = "⚠️ يُحفظ في: " + sv + "\nللحفظ في Downloads: الإعدادات ← التطبيقات ← تحميل غصب ← الصلاحيات ← الوصول لكل الملفات"
+            perm.color = "#fbbf24"
         else:
-            perm.value = "✅ التخزين: " + sv
-            perm.color = "#6ee7b7"
+            perm.value = "⚠️ التخزين: " + sv
+            perm.color = "#fbbf24"
         log("chk_perm: " + sv)
         try:
             page.update()
