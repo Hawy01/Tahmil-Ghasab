@@ -168,9 +168,14 @@ def main(page: ft.Page):
         except Exception as ex:
             log_exc("on_file", ex)
 
-    picker = ft.FilePicker(on_result=on_file)
-    page.overlay.append(picker)
-    log("picker added")
+    try:
+        picker = ft.FilePicker()
+        picker.on_result = on_file
+        page.overlay.append(picker)
+        log("picker added")
+    except Exception as ex:
+        log_exc("picker_init", ex)
+        picker = None
 
     # ── Download logic ────────────────────────────────────────────
     def do_dl(url, qual):
@@ -287,6 +292,10 @@ def main(page: ft.Page):
         ).start()
 
     def pick_ck(_):
+        if picker is None:
+            cklab.value = "FilePicker غير متاح"
+            page.update()
+            return
         try:
             picker.pick_files(
                 dialog_title="اختر ملف كوكيز .txt",
