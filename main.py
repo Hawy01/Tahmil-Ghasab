@@ -112,7 +112,7 @@ def main(page: ft.Page):
     page.padding    = 16
     page.scroll     = ft.ScrollMode.AUTO
 
-    state = {"dl": False, "cookies": None}
+    state = {"dl": False, "cookies": None, "last_file": None}
 
     # ── Controls ──────────────────────────────────────────────────
     url_in = ft.TextField(
@@ -147,6 +147,13 @@ def main(page: ft.Page):
     )
 
     # ── Log dialog ────────────────────────────────────────────────
+    snack = ft.SnackBar(
+        content=ft.Text("", color="white"),
+        bgcolor="#1a3a2a",
+        duration=7000,
+    )
+    page.overlay.append(snack)
+
     log_dlg = ft.AlertDialog(
         title=ft.Text("سجل الأحداث"),
         content=ft.Container(
@@ -203,6 +210,21 @@ def main(page: ft.Page):
                         bar.value    = 1
                         status.value = "جاري المعالجة..."
                         status.color = "#60a5fa"
+                        # تشغيل Media Scanner
+                        filepath = d.get("filename", "")
+                        if filepath:
+                            state["last_file"] = filepath
+                            try:
+                                import subprocess
+                                subprocess.run(
+                                    ["am", "broadcast",
+                                     "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                                     "-d", "file://" + filepath],
+                                    capture_output=True, timeout=5
+                                )
+                                log("media_scan: " + filepath)
+                            except Exception as _e:
+                                log("media_scan failed: " + str(_e))
                         page.update()
                 except Exception:
                     pass
@@ -233,6 +255,9 @@ def main(page: ft.Page):
             status.value = "✅ تم التحميل!\nالمجلد: " + sv
             status.color = "#6ee7b7"
             bar.value    = 1
+            snack.content.value = "✅ تم التحميل في: " + sv
+            snack.bgcolor       = "#1a3a2a"
+            snack.open          = True
 
         except Exception as ex:
             log_exc("do_dl", ex)
@@ -248,6 +273,9 @@ def main(page: ft.Page):
             else:
                 status.value = "❌ فشل: " + err[:60]
             status.color = "#f87171"
+            snack.content.value = status.value
+            snack.bgcolor       = "#3a1a1a"
+            snack.open          = True
 
         finally:
             state["dl"]      = False
