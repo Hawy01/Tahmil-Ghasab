@@ -252,10 +252,26 @@ def main(page: ft.Page):
                 ydl.download([url])
 
             log("dl complete ✓ → " + sv)
-            status.value = "✅ تم التحميل!\nالمجلد: " + sv
+            # حاول نقل الملف لـ Downloads إذا كان محفوظاً داخلياً
+            final_path = sv
+            if sv and "/data/data/" in sv:
+                import shutil
+                dl_dir = "/storage/emulated/0/Download"
+                try:
+                    os.makedirs(dl_dir, exist_ok=True)
+                    lf = state.get("last_file", "")
+                    if lf and os.path.isfile(lf):
+                        dst = os.path.join(dl_dir, os.path.basename(lf))
+                        shutil.copy2(lf, dst)
+                        os.remove(lf)
+                        final_path = dl_dir
+                        log("moved to Downloads: " + dst)
+                except Exception as _ce:
+                    log("move failed: " + str(_ce))
+            status.value = "✅ تم التحميل!\nالمجلد: " + final_path
             status.color = "#6ee7b7"
             bar.value    = 1
-            snack.content.value = "✅ تم التحميل في: " + sv
+            snack.content.value = "✅ تم التحميل في: " + final_path
             snack.bgcolor       = "#1a3a2a"
             snack.open          = True
 
@@ -318,6 +334,33 @@ def main(page: ft.Page):
     dl_btn = ft.ElevatedButton("تحميل غصب", on_click=on_dl)
     lg_btn = ft.TextButton("📋 سجل",       on_click=show_log)
 
+    def open_perm_settings(_):
+        import subprocess
+        # فتح صفحة صلاحية "الوصول لكل الملفات" مباشرةً
+        r = subprocess.run(
+            ["am", "start",
+             "-a", "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION",
+             "-d", "package:" + PKG],
+            capture_output=True, timeout=5
+        )
+        if r.returncode != 0:
+            # بديل للأجهزة القديمة
+            subprocess.run(
+                ["am", "start",
+                 "-a", "android.settings.APPLICATION_DETAILS_SETTINGS",
+                 "-d", "package:" + PKG],
+                capture_output=True, timeout=5
+            )
+        log("opened permission settings")
+
+    perm_btn = ft.ElevatedButton(
+        "🔓 منح صلاحية التخزين",
+        on_click=open_perm_settings,
+        bgcolor="#3b1f6e",
+        color="white",
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+    )
+
     # ── Build page ────────────────────────────────────────────────
     log("building page...")
     page.add(
@@ -329,6 +372,7 @@ def main(page: ft.Page):
         quality,
         ck_field,
         perm,
+        perm_btn,
         dl_btn,
         bar,
         blabel,
